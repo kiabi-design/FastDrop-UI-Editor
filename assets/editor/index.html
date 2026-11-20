@@ -1,25 +1,191 @@
-＋ Кнопка
-＋ Текст
-＋ Карточка
-Сбросить макет
-
-FastDrop UI Editor
-Макет уже готов. Нажми на элемент, чтобы выбрать его. Перетаскивай пальцем, а за зелёную точку меняй размер.
-Текст элемента
-Ширина, px
-Высота, px
-Размер текста
-Скругление
-Цвет текста
-Цвет фона
-Позиция X
-Позиция Y
-Прозрачность, %
-На передний план
-Удалить
-Экспорт JSON
-Открыть проект
-Экспорт HTML
-Экспорт CSS
-Слои
-Подсказка: на iPhone двигай элементы одним пальцем. Выдели элемент — появится зелёный маркер изменения размера. Можно также точно задать ширину, высоту и координаты в полях. Макет сразу открывается с готовым дизайном FastDrop.
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>FastDrop UI Editor</title>
+<style>
+:root{--green:#b7ff62;--muted:#89939d}
+*{box-sizing:border-box}
+body{margin:0;background:#07090b;color:#f4f6f8;font:15px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.app{max-width:1100px;margin:auto;padding:14px;display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px}
+main{min-width:0}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+button{border:1px solid #35404a;border-radius:12px;background:#1a222a;color:#fff;padding:11px 13px;font:600 14px inherit}
+button.primary{background:var(--green);color:#11170a;border-color:var(--green)}
+button.danger{color:#ff9999}
+.preview-wrap{display:flex;justify-content:center;padding:12px;background:#0d1115;border:1px solid #252e36;border-radius:22px}
+.stage{position:relative;width:min(390px,100%);aspect-ratio:390/844;overflow:hidden;border-radius:30px;border:1px solid #344039;touch-action:none;background:
+ radial-gradient(ellipse at 100% 22%,#063b1b80 0,transparent 33%),
+ radial-gradient(ellipse at 0% 78%,#03220e80 0,transparent 32%),
+ linear-gradient(160deg,#070b0b,#020404 65%,#080d09)}
+.node{position:absolute;display:flex;align-items:center;justify-content:center;text-align:center;white-space:pre-wrap;overflow:visible;padding:1.8%;border:1px solid #ffffff30;background:#11171ddd;color:#fff;backdrop-filter:blur(12px);font-weight:500;line-height:1.2;touch-action:none;user-select:none;cursor:grab;z-index:2}
+.node.text{background:transparent!important;border-color:transparent!important;backdrop-filter:none;justify-content:flex-start;text-align:left}
+.node.card{justify-content:flex-start;text-align:left;border-radius:6%;box-shadow:0 8px 24px #0005}
+.node.button{border:0;border-radius:50px;background:var(--green);color:#101609;font-weight:750;box-shadow:0 5px 20px #b7ff6220}
+.node.selected{outline:2px solid var(--green);outline-offset:2px;z-index:20}
+.handle{position:absolute;right:-8px;bottom:-8px;width:20px;height:20px;border-radius:50%;background:var(--green);border:3px solid #071009;display:none;touch-action:none}
+.node.selected .handle{display:block}
+.editor{align-self:start;background:#11161b;border:1px solid #29333c;border-radius:20px;padding:16px;position:sticky;top:12px}
+h1{font-size:21px;margin:0 0 5px}.hint{font-size:12px;color:var(--muted);margin:0 0 16px;line-height:1.4}
+label{display:block;color:#aeb8c2;font-size:12px;margin:11px 0 5px}
+input,textarea{width:100%;background:#080c10;border:1px solid #303b45;border-radius:10px;padding:10px;color:#fff;font:inherit;min-width:0}
+textarea{min-height:66px;resize:vertical}
+input:disabled,textarea:disabled{opacity:.45}
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:0 9px}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+.actions button:last-child{grid-column:1/-1}
+.layers{margin-top:16px;padding-top:12px;border-top:1px solid #29333c;color:#cbd4dc;font-size:13px}.layers-list{display:grid;gap:6px;margin-top:8px}.layer-item{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border-radius:9px;background:#080c10;border:1px solid #29333c;font-size:12px}.layer-item.active{border-color:var(--green);color:var(--green)}.layer-item button{padding:4px 8px;font-size:11px}
+.note{font-size:11px;color:#82909b;line-height:1.5;margin:12px 0 0}
+@media(max-width:760px){
+ .app{display:flex;flex-direction:column;padding:10px;gap:12px}
+ .editor{position:static;order:2}
+ .preview-wrap{order:1;padding:8px}
+ .stage{width:min(390px,100%)}
+ .toolbar{order:0}
+}
+</style>
+</head>
+<body>
+<div class="app">
+ <main>
+  <div class="toolbar">
+   <button class="primary" onclick="addNode('button')">＋ Кнопка</button>
+   <button onclick="addNode('text')">＋ Текст</button>
+   <button onclick="addNode('card')">＋ Карточка</button>
+   <button onclick="resetLayout()">Сбросить макет</button>
+  </div>
+  <div class="preview-wrap"><div id="stage" class="stage" aria-label="Редактируемый макет FastDrop"></div></div>
+ </main>
+ <aside class="editor">
+  <h1>FastDrop UI Editor</h1>
+  <p class="hint">Макет уже готов. Нажми на элемент, чтобы выбрать его. Перетаскивай пальцем, а за зелёную точку меняй размер.</p>
+  <label>Текст элемента</label><textarea id="txt" disabled placeholder="Выбери элемент на макете"></textarea>
+  <div class="fields">
+   <div><label>Ширина, px</label><input id="w" type="number" min="25" max="390" disabled></div>
+   <div><label>Высота, px</label><input id="h" type="number" min="20" max="844" disabled></div>
+   <div><label>Размер текста</label><input id="fs" type="number" min="8" max="48" disabled></div>
+   <div><label>Скругление</label><input id="radius" type="number" min="0" max="100" disabled></div>
+   <div><label>Цвет текста</label><input id="color" type="color" value="#ffffff" disabled></div>
+   <div><label>Цвет фона</label><input id="fill" type="color" value="#151a20" disabled></div>
+   <div><label>Позиция X</label><input id="x" type="number" disabled></div>
+   <div><label>Позиция Y</label><input id="y" type="number" disabled></div>
+   <div><label>Прозрачность, %</label><input id="opacity" type="number" min="0" max="100" value="100" disabled></div>
+  </div>
+  <div class="actions">
+   <button onclick="bringFront()">На передний план</button>
+   <button class="danger" onclick="removeSelected()">Удалить</button>
+   <button onclick="saveJSON()">Экспорт JSON</button>
+   <button onclick="loadJSON()">Открыть проект</button>
+   <button class="primary" onclick="downloadHTML()">Экспорт HTML</button><button onclick="downloadCSS()">Экспорт CSS</button>
+  </div>
+  <div class="layers"><b>Слои</b><div id="layersList" class="layers-list"></div></div>
+  <p class="note">Подсказка: на iPhone двигай элементы одним пальцем. Выдели элемент — появится зелёный маркер изменения размера. Можно также точно задать ширину, высоту и координаты в полях. Макет сразу открывается с готовым дизайном FastDrop.</p>
+ </aside>
+</div>
+<script>
+const stage=document.getElementById('stage');
+const fields=['txt','w','h','fs','radius','color','fill','x','y','opacity'];
+const $=id=>document.getElementById(id);
+let items=[],selected=null,z=20,drag=null;
+function seed(){
+ items=[
+ {id:'brand',type:'text',text:'⚡  FastDrop',x:22,y:48,w:245,h:50,fs:31,radius:0,color:'#ffffff',fill:'#151a20',opacity:100,z:1},
+ {id:'subtitle',type:'text',text:'LOCAL FILE TRANSFER  ·  v1.2',x:27,y:98,w:255,h:25,fs:12,radius:0,color:'#929da8',fill:'#151a20',z:2},
+ {id:'settings',type:'card',text:'⚙',x:286,y:52,w:44,h:44,fs:23,radius:50,color:'#ffffff',fill:'#171d23',z:3},
+ {id:'refresh',type:'card',text:'↻',x:340,y:52,w:44,h:44,fs:24,radius:50,color:'#ffffff',fill:'#171d23',z:4},
+ {id:'ipcard',type:'card',text:'●  МОЙ IP\\n192.168.1.100\\n●  ОНЛАЙН',x:18,y:145,w:354,h:132,fs:19,radius:27,color:'#ffffff',fill:'#11171d',z:5},
+ {id:'receive',type:'button',text:'↓\\nПолучить файл\\nОжидание передачи',x:22,y:300,w:168,h:160,fs:18,radius:27,color:'#b7ff62',fill:'#142019',z:6},
+ {id:'send',type:'button',text:'↑\\nОтправить файл\\nВыбрать файл',x:200,y:300,w:168,h:160,fs:18,radius:27,color:'#ffffff',fill:'#20252b',z:7},
+ {id:'recipienttitle',type:'text',text:'УСТРОЙСТВО ПОЛУЧАТЕЛЯ',x:22,y:480,w:345,h:25,fs:12,radius:0,color:'#a5afb9',fill:'#151a20',z:8},
+ {id:'recipient',type:'card',text:'▣   IP-АДРЕС\\n172.20.10.1                         ▢   ⌨',x:20,y:520,w:350,h:100,fs:18,radius:24,color:'#ffffff',fill:'#11171d',z:9},
+ {id:'quicktitle',type:'text',text:'БЫСТРЫЙ ВЫБОР',x:22,y:635,w:345,h:22,fs:12,radius:0,color:'#a5afb9',fill:'#151a20',z:10},
+ {id:'quick1',type:'card',text:'◷   172.20.10.1',x:20,y:665,w:168,h:56,fs:14,radius:28,color:'#dce2e8',fill:'#151b21',z:11},
+ {id:'quick2',type:'card',text:'⌁   192.168.1.1',x:200,y:665,w:170,h:56,fs:14,radius:28,color:'#dce2e8',fill:'#151b21',z:12},
+ {id:'secure',type:'card',text:'✓   Безопасная передача\\nФайлы остаются в локальной сети     ›',x:20,y:745,w:350,h:72,fs:13,radius:23,color:'#ffffff',fill:'#11171d',z:13}
+ ];z=20;
+}
+function render(){
+ stage.querySelectorAll('.node').forEach(n=>n.remove());
+ items.forEach(it=>{
+  const el=document.createElement('div');
+  el.className='node '+it.type+(selected===it.id?' selected':'');
+  el.dataset.id=it.id;
+  el.textContent=it.text;
+  applyStyle(el,it);
+  const h=document.createElement('span');h.className='handle';el.appendChild(h);
+  el.addEventListener('pointerdown',e=>beginPointer(e,it,e.target===h));
+  el.addEventListener('click',e=>{e.stopPropagation();if(!drag)select(it.id)});
+  stage.appendChild(el);
+ });
+ renderLayers();
+}
+function renderLayers(){const box=$('layersList');if(!box)return;box.innerHTML='';[...items].sort((a,b)=>b.z-a.z).forEach(it=>{const row=document.createElement('div');row.className='layer-item'+(selected===it.id?' active':'');const name=document.createElement('span');name.textContent=(it.type==='text'?'Текст':it.type==='button'?'Кнопка':'Карточка')+' · '+it.id;const btn=document.createElement('button');btn.textContent='Выбрать';btn.onclick=()=>select(it.id);row.append(name,btn);box.appendChild(row)});}
+function applyStyle(el,it){
+ const scale=stage.clientWidth/390;
+ el.style.left=(it.x/390*100)+'%';el.style.top=(it.y/844*100)+'%';
+ el.style.width=(it.w/390*100)+'%';el.style.height=(it.h/844*100)+'%';
+ el.style.fontSize=(it.fs*scale)+'px';el.style.borderRadius=it.radius+'px';
+ el.style.color=it.color;el.style.background=it.type==='text'?'transparent':it.fill;el.style.opacity=(it.opacity??100)/100;el.style.zIndex=it.z;
+}
+function select(id){
+ selected=id;
+ const it=items.find(v=>v.id===id);
+ fields.forEach(f=>$(f).disabled=!it);
+ if(it){
+  $('txt').value=it.text;$('w').value=it.w;$('h').value=it.h;$('fs').value=it.fs;$('radius').value=it.radius;
+  $('color').value=it.color;$('fill').value=it.fill;$('x').value=it.x;$('y').value=it.y;$('opacity').value=it.opacity??100;
+ }
+ stage.querySelectorAll('.node').forEach(n=>n.classList.toggle('selected',n.dataset.id===id));
+}
+function beginPointer(e,it,resizing){
+ e.preventDefault();e.stopPropagation();select(it.id);
+ drag={id:it.id,resizing,startX:e.clientX,startY:e.clientY,x:it.x,y:it.y,w:it.w,h:it.h,moved:false};
+ try{e.currentTarget.setPointerCapture(e.pointerId)}catch(_){}
+}
+window.addEventListener('pointermove',e=>{
+ if(!drag)return;
+ const it=items.find(v=>v.id===drag.id);if(!it)return;
+ const k=390/stage.clientWidth,dx=(e.clientX-drag.startX)*k,dy=(e.clientY-drag.startY)*k;
+ if(Math.abs(dx)+Math.abs(dy)>2)drag.moved=true;
+ if(drag.resizing){it.w=Math.max(35,Math.min(390-drag.x,drag.w+dx));it.h=Math.max(28,Math.min(844-drag.y,drag.h+dy))}
+ else{it.x=Math.max(0,Math.min(390-it.w,drag.x+dx));it.y=Math.max(0,Math.min(844-it.h,drag.y+dy))}
+ const el=stage.querySelector('.node[data-id="'+it.id+'"]');
+ if(el)applyStyle(el,it);
+ syncFields(it);
+});
+window.addEventListener('pointerup',()=>{drag=null});
+window.addEventListener('pointercancel',()=>{drag=null});
+stage.addEventListener('click',()=>{if(!drag)select(null)});
+function syncFields(it){$('w').value=Math.round(it.w);$('h').value=Math.round(it.h);$('x').value=Math.round(it.x);$('y').value=Math.round(it.y)}
+fields.forEach(f=>$(f).addEventListener('input',()=>{
+ const it=items.find(v=>v.id===selected);if(!it)return;
+ const map={txt:'text',w:'w',h:'h',fs:'fs',radius:'radius',color:'color',fill:'fill',x:'x',y:'y',opacity:'opacity'};
+ const key=map[f],val=$(f).value;
+ it[key]=['text','color','fill'].includes(key)?val:Number(val);if(key==='opacity')it.opacity=Math.max(0,Math.min(100,it.opacity));
+ it.w=Math.max(25,Math.min(390,it.w));it.h=Math.max(20,Math.min(844,it.h));
+ it.x=Math.max(0,Math.min(390-it.w,it.x));it.y=Math.max(0,Math.min(844-it.h,it.y));
+ render();
+}));
+function addNode(type){
+ const it={id:'el'+Date.now(),type,text:type==='button'?'Новая кнопка':type==='card'?'Новая карточка':'Новый текст',
+ x:35,y:100,w:type==='text'?230:type==='card'?300:180,h:type==='text'?48:type==='card'?100:58,
+ fs: type==='text'?22:16,radius:type==='button'?40:20,color:type==='button'?'#10150a':'#ffffff',
+ fill:type==='button'?'#b7ff62':'#151a20',opacity:100,z:++z};
+ items.push(it);select(it.id);
+}
+function removeSelected(){items=items.filter(i=>i.id!==selected);selected=null;render();fields.forEach(f=>$(f).disabled=true)}
+function bringFront(){const it=items.find(i=>i.id===selected);if(it){it.z=++z;render()}}
+function resetLayout(){if(confirm('Вернуть исходный дизайн FastDrop?')){seed();selected=null;render();fields.forEach(f=>$(f).disabled=true)}}
+function download(blob,name){const a=document.createElement('a');const u=URL.createObjectURL(blob);a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1500)}
+function sendExport(kind,content,name,mime){if(window.EditorBridge&&window.EditorBridge.postMessage){window.EditorBridge.postMessage(JSON.stringify({type:'export',kind:kind,content:content,name:name,mime:mime}));}else{download(new Blob([content],{type:mime}),name)}}
+function saveJSON(){sendExport('json',JSON.stringify({version:2,items},null,2),'fastdrop-layout.json','application/json')}
+function loadJSON(){const inp=document.createElement('input');inp.type='file';inp.accept='.json,application/json';inp.onchange=()=>{const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!Array.isArray(d.items))throw Error();items=d.items;selected=null;render();fields.forEach(f=>$(f).disabled=true)}catch(_){alert('Не удалось открыть этот проект')}};r.readAsText(inp.files[0])};inp.click()}
+function downloadHTML(){const source='<!doctype html>\n'+document.documentElement.outerHTML;const marker='seed();render();fields.forEach(f=>$(f).disabled=true);';const state='items=JSON.parse('+JSON.stringify(JSON.stringify({version:2,items:items}))+').items;z=Math.max(20,...items.map(x=>x.z||0));render();fields.forEach(f=>$(f).disabled=true);';sendExport('html',source.replace(marker,state),'FastDrop_UI_Editor.html','text/html')}
+function downloadCSS(){const css=[...document.styleSheets].map(s=>{try{return [...s.cssRules].map(r=>r.cssText).join('\n')}catch(e){return ''}}).join('\n');sendExport('css',css,'fastdrop-style.css','text/css')}
+function importProjectJson(raw){try{const d=JSON.parse(raw);if(!Array.isArray(d.items))throw Error('bad format');items=d.items;items.forEach((it,i)=>{if(typeof it.opacity!=='number')it.opacity=100;if(typeof it.z!=='number')it.z=i+1});z=Math.max(20,...items.map(x=>x.z||0));selected=null;render();fields.forEach(f=>$(f).disabled=true);return true}catch(e){return false}}
+window.importProjectJson=importProjectJson;
+seed();render();fields.forEach(f=>$(f).disabled=true);
+</script>
+</body>
+</html>

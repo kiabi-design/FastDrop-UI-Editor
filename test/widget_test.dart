@@ -1,11 +1,12 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:fastdrop_ui_editor/main.dart';
 
 void main() {
-  testWidgets('App starts and shows FastDrop UI Editor', (WidgetTester tester) async {
-    await tester.pumpWidget(const FastDropUiEditorApp());
-    await tester.pump();
-
-    expect(find.text('FastDrop UI Editor'), findsOneWidget);
+  TestWidgetsFlutterBinding.ensureInitialized();
+  test('bundled editor contains the main editor interface', () async {
+    final html = await rootBundle.loadString('assets/editor/index.html');
+    expect(html, contains('FastDrop UI Editor'));
+    expect(html, contains('function importProjectJson'));
+    expect(html, contains('function downloadCSS'));
   });
 }

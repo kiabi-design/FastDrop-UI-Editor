@@ -1,161 +1,88 @@
-// ignore_for_file: deprecated_member_use
-
+import 'dart:convert';
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
-void main() {
-  WidgetsFlutterBinding.ensureInitialized();
-  runApp(const FastDropUiEditorApp());
-}
+void main() => runApp(const FastDropEditorApp());
 
-class FastDropUiEditorApp extends StatelessWidget {
-  const FastDropUiEditorApp({super.key});
-
+class FastDropEditorApp extends StatelessWidget {
+  const FastDropEditorApp({super.key});
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'FastDrop UI Editor',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF07090B),
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFB7FF62),
-          brightness: Brightness.dark,
-        ),
-      ),
-      home: const EditorAssetScreen(),
-    );
-  }
+  Widget build(BuildContext context) => MaterialApp(
+    title: 'FastDrop UI Editor', debugShowCheckedModeBanner: false,
+    theme: ThemeData.dark(useMaterial3: true).copyWith(
+      scaffoldBackgroundColor: const Color(0xFF07090B),
+      colorScheme: const ColorScheme.dark(primary: Color(0xFFB7FF62), secondary: Color(0xFFB7FF62)),
+      appBarTheme: const AppBarTheme(backgroundColor: Color(0xFF07090B), foregroundColor: Colors.white),
+    ), home: const EditorScreen());
 }
 
-class EditorAssetScreen extends StatefulWidget {
-  const EditorAssetScreen({super.key});
-
+class EditorScreen extends StatefulWidget {
+  const EditorScreen({super.key});
   @override
-  State<EditorAssetScreen> createState() => _EditorAssetScreenState();
+  State<EditorScreen> createState() => _EditorScreenState();
 }
 
-class _EditorAssetScreenState extends State<EditorAssetScreen> {
-  late Future<String> _htmlFuture;
+class _EditorScreenState extends State<EditorScreen> {
+  late final WebViewController _controller;
+  bool _ready = false;
+  String _status = 'Загрузка редактора…';
 
   @override
   void initState() {
     super.initState();
-    _htmlFuture = rootBundle.loadString('assets/editor/index.html');
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..addJavaScriptChannel('EditorBridge', onMessageReceived: _onBridgeMessage)
+      ..setNavigationDelegate(NavigationDelegate(
+        onPageFinished: (_) { if (mounted) setState(() { _ready = true; _status = 'Редактор готов'; }); },
+        onWebResourceError: (e) { if (mounted) setState(() => _status = 'Ошибка загрузки: ${e.description}'); },
+      ));
+    _loadEditor();
   }
 
-  Future<void> _reloadAsset() async {
-    setState(() {
-      _htmlFuture = rootBundle.loadString('assets/editor/index.html');
-    });
+  Future<void> _loadEditor() async {
+    final html = await rootBundle.loadString('assets/editor/index.html');
+    await _controller.loadHtmlString(html, baseUrl: 'https://fastdrop.local/');
   }
 
-  Future<void> _copyHtml(String html) async {
-    await Clipboard.setData(ClipboardData(text: html));
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('HTML редактора скопирован в буфер обмена')),
-    );
+  Future<void> _onBridgeMessage(JavaScriptMessage message) async {
+    try {
+      final data = jsonDecode(message.message) as Map<String, dynamic>;
+      if (data['type'] != 'export') return;
+      final name = data['name'] as String? ?? 'fastdrop-export.txt';
+      final content = data['content'] as String? ?? '';
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/$name');
+      await file.writeAsString(content, flush: true);
+      await Share.shareXFiles([XFile(file.path, mimeType: data['mime'] as String?)], text: 'Экспорт из FastDrop UI Editor');
+      if (mounted) setState(() => _status = 'Подготовлен файл $name');
+    } catch (e) {
+      if (mounted) setState(() => _status = 'Не удалось экспортировать файл');
+    }
+  }
+
+  Future<void> _importProject() async {
+    final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['json'], withData: true);
+    if (result == null || result.files.single.bytes == null) return;
+    final raw = utf8.decode(result.files.single.bytes!);
+    final encoded = jsonEncode(raw);
+    await _controller.runJavaScript('window.importProjectJson($encoded)');
+    if (mounted) setState(() => _status = 'Импорт завершён');
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('FastDrop UI Editor'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _reloadAsset,
-            tooltip: 'Обновить ресурс',
-          ),
-        ],
-      ),
-      body: FutureBuilder<String>(
-        future: _htmlFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Text(
-                  'Ошибка загрузки assets/editor/index.html:\n${snapshot.error}',
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            );
-          }
-
-          final htmlContent = snapshot.data ?? '';
-          return Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF11161B),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: const Color(0xFF29333C)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Ресурс подключён',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFFB7FF62),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text('Путь: assets/editor/index.html'),
-                      const SizedBox(height: 4),
-                      Text('Размер шаблона: ${htmlContent.length} символов'),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFB7FF62),
-                    foregroundColor: const Color(0xFF11170A),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
-                  onPressed: htmlContent.isEmpty ? null : () => _copyHtml(htmlContent),
-                  icon: const Icon(Icons.copy),
-                  label: const Text('Скопировать HTML-шаблон'),
-                ),
-                const SizedBox(height: 14),
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0D1115),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFF252E36)),
-                    ),
-                    child: SingleChildScrollView(
-                      child: SelectableText(
-                        htmlContent,
-                        style: const TextStyle(
-                          fontFamily: 'monospace',
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('⚡ FastDrop UI Editor', style: TextStyle(fontWeight: FontWeight.w700)),
+      actions: [IconButton(tooltip: 'Открыть JSON-проект', onPressed: _ready ? _importProject : null, icon: const Icon(Icons.folder_open_rounded))]),
+    body: SafeArea(child: Column(children: [
+      Expanded(child: WebViewWidget(controller: _controller)),
+      Container(height: 34, padding: const EdgeInsets.symmetric(horizontal: 14), alignment: Alignment.centerLeft,
+        color: const Color(0xFF11161B), child: Text(_status, style: const TextStyle(fontSize: 11, color: Color(0xFF9AA6B2)))),
+    ])),
+  );
 }
