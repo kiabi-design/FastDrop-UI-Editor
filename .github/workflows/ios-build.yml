@@ -1,0 +1,17 @@
+name: Build iOS app
+on:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Generate iOS platform files if missing
+        run: |
+          if [ ! -d ios ]; then flutter create . --platforms=android,ios --org com.kiabi.fastdrop --project-name fastdrop_ui_editor; fi
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter build ios --release --no-codesign
