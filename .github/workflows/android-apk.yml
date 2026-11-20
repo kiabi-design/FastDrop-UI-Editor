@@ -1,24 +1,84 @@
 name: Build Android APK
+
 on:
-  workflow_dispatch:
   push:
     branches: [ main, master ]
+  workflow_dispatch:
+
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
         with:
           channel: stable
-      - name: Generate Android platform files if missing
+
+      - name: Generate Android platform files
         run: |
-          if [ ! -d android ]; then flutter create . --platforms=android,ios --org com.kiabi.fastdrop --project-name fastdrop_ui_editor; fi
-      - run: flutter pub get
-      - run: flutter analyze
-      - run: flutter test
-      - run: flutter build apk --release
-      - uses: actions/upload-artifact@v4
+          if [ -f tool/bootstrap_platforms.sh ]; then
+            chmod +x tool/bootstrap_platforms.sh
+            ./tool/bootstrap_platforms.sh
+          else
+            flutter create --platforms=android .
+          fi
+
+      - name: Ensure Android compileSdk 36
+        run: |
+          if [ -f android/app/build.gradle ]; then
+            sed -i -E 's/compileSdk[[:space:]]*[=]?[[:space:]]*(flutter\.compileSdkVersion|[0-9]+)/compileSdk = 36/g' android/app/build.gradle
+          fi
+          if [ -f android/app/build.gradle.kts ]; then
+            sed -i -E 's/compileSdk[[:space:]]*=[[:space:]]*(flutter\.compileSdkVersion|[0-9]+)/compileSdk = 36/g' android/app/build.gradle.kts
+          fi
+          if [ -f android/build.gradle ]; then
+            cat << 'EOF' >> android/build.gradle
+
+          subprojects {
+              afterEvaluate { project ->
+                  if (project.hasProperty("android")) {
+                      project.android {
+                          compileSdkVersion 36
+                      }
+                  }
+              }
+          }
+          EOF
+          fi
+          if [ -f android/build.gradle.kts ]; then
+            cat << 'EOF' >> android/build.gradle.kts
+
+          subprojects {
+              afterEvaluate {
+                  extensions.findByName("android")?.let { androidExt ->
+                      try {
+                          val setCompileSdk = androidExt.javaClass.getMethod("setCompileSdkVersion", Int::class.javaPrimitiveType)
+                          setCompileSdk.invoke(androidExt, 36)
+                      } catch (_: Exception) {}
+                  }
+              }
+          }
+          EOF
+          fi
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze project
+        run: flutter analyze
+
+      - name: Run tests
+        run: flutter test
+
+      - name: Build Android APK
+        run: flutter build apk --release
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: fastdrop-ui-editor-android-apk
+          name: FastDrop-UI-Editor-release-apk
           path: build/app/outputs/flutter-apk/app-release.apk
