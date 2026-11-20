@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -euo pipefail
+flutter create . --platforms=android,ios --org com.kiabi.fastdrop --project-name fastdrop_ui_editor
+flutter pub get
