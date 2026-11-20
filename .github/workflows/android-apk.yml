@@ -1,0 +1,24 @@
+name: Build Android APK
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Generate Android platform files if missing
+        run: |
+          if [ ! -d android ]; then flutter create . --platforms=android,ios --org com.kiabi.fastdrop --project-name fastdrop_ui_editor; fi
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+      - run: flutter build apk --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fastdrop-ui-editor-android-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
